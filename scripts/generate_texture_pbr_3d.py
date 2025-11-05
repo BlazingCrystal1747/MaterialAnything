@@ -161,7 +161,7 @@ def init_args():
     parser.add_argument("--no_update", action="store_true", help="do NOT apply update")
 
     # device parameters
-    parser.add_argument("--device", type=str, choices=["a6000", "2080"], default="a6000")
+    parser.add_argument("--device", type=str, choices=["4090", "3090"], default="4090")
 
     # camera parameters NOTE need careful tuning!!!
     parser.add_argument("--test_camera", action="store_true")
@@ -176,7 +176,7 @@ def init_args():
 
     args = parser.parse_args()
 
-    if args.device == "a6000":
+    if args.device == "4090":
         setattr(args, "render_simple_factor", 12)
         setattr(args, "fragment_k", 1)
         setattr(args, "image_size", 768)
@@ -222,7 +222,18 @@ if __name__ == "__main__":
     )
 
 
-    init_texture = Image.open(os.path.join(args.input_dir, 'texture_kd.png')).convert("RGB").resize((args.uv_size, args.uv_size))
+    # Load initial texture if present; otherwise create a blank white texture so the pipeline can continue
+    texture_path = os.path.join(args.input_dir, 'texture_kd.png')
+    if os.path.exists(texture_path):
+        try:
+            init_texture = Image.open(texture_path).convert("RGB").resize((args.uv_size, args.uv_size))
+        except Exception as e:
+            print(f"=> Failed to open existing texture_kd.png ({texture_path}): {e}")
+            print("=> Creating a blank white texture instead.")
+            init_texture = Image.new('RGB', (args.uv_size, args.uv_size), color=(255, 255, 255))
+    else:
+        print(f"=> texture_kd.png not found at {texture_path}. Creating a blank white texture.")
+        init_texture = Image.new('RGB', (args.uv_size, args.uv_size), color=(255, 255, 255))
     init_albedo = Image.new('RGB', (1024, 1024), color=(255, 255, 255))
     init_roughness_metallic = Image.new('RGB', (1024, 1024), color=(255, 255, 255))
     init_bump = Image.new('RGB', (1024, 1024), color=(255, 255, 255))
@@ -431,8 +442,9 @@ if __name__ == "__main__":
         generate_image_before.save(os.path.join(inpainted_image_dir, "{}_before.png".format(view_idx)))
         generate_image_after.save(os.path.join(inpainted_image_dir, "{}_after.png".format(view_idx)))
 
-        # set the background of generate_image to white using all_mask_tensor
-        generate_image_np = np.array(init_image)
+        # set the background of generate_image_after to white using all_mask_tensor
+        # IMPORTANT: use diffusion output (generate_image_after) instead of init_image
+        generate_image_np = np.array(generate_image_after)
         generate_image_np[valid_mask_tensor.cpu().numpy() == 0] = 255
         generate_image = Image.fromarray(generate_image_np)
         generate_image.save(os.path.join(inpainted_image_dir, "{}_wb.png".format(view_idx)))
@@ -483,7 +495,7 @@ if __name__ == "__main__":
         )
         
         # project mask
-        init_mask, _, exist_mask = backproject_from_image(
+        init_mask, project_mask_image, exist_mask = backproject_from_image(
             mesh, faces, new_verts_uvs, cameras, 
             update_mask_image.convert('RGB'), update_mask_image, update_mask_image, init_mask, exist_mask, 
             args.image_size * args.render_simple_factor, args.uv_size, args.fragment_k,

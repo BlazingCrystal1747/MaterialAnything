@@ -1,8 +1,19 @@
 
+# 选一张卡（或按需改）
+export CUDA_VISIBLE_DEVICES=0
+
+# 先取消旧设置（如果你之前 export 过）
+unset PYTORCH_CUDA_ALLOC_CONF
+
+# 用 1.12 可用的参数重新设置（先试 128MB；还 OOM 再改 64MB）
+export PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.9,max_split_size_mb:128
+# 若仍 OOM，可试：
+# export PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:64
+
 #!/bin/bash
 
 mesh_dir="./demo"  # Replace with the actual dir containing the mesh files
-uid=20250609
+uid=20251029
 video_dir=./outputs/a_baseline_ours_texture # The directory where the video will be saved
 output_dir=./outputs/$uid
 
@@ -10,7 +21,7 @@ output_dir=./outputs/$uid
 python scripts/generate_texture_pbr_3d.py \
     --image2materials_model ./pretrained_models/material_estimator \
     --uvrefine_model ./pretrained_models/material_refiner \
-    --input_dir $mesh_path \
+    --input_dir $mesh_dir \
     --output_dir $output_dir \
     --obj_name mesh \
     --obj_file mesh.obj \
@@ -29,14 +40,14 @@ python scripts/generate_texture_pbr_3d.py \
     --update_mode heuristic \
     --seed 42 \
     --post_process \
-    --device 2080 \
+    --device 3090 \
     --use_objaverse # assume the mesh is normalized with y-axis as up
     
 # Render the video using Blender
-python render_video_bpy_4s.py \
-    --object_path $output_dir/generate/mesh/0.obj \
-    --materials_dir $output_dir/generate/material \
-    --output_dir $video_dir \
-    --obj_uid $uid
+# python render_video_bpy_4s.py \
+#    --object_path $output_dir/generate/mesh/0.obj \
+#    --materials_dir $output_dir/generate/material \
+#    --output_dir $video_dir \
+#    --obj_uid $uid
 
 

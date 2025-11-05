@@ -1,0 +1,12 @@
+# Pin the exact PyTorch stack (installed via conda)
+torch==1.12.1
+torchvision==0.13.1
+torchaudio==0.12.1
+numpy<2
+huggingface_hub==0.20.2
+diffusers==0.28.2
+transformers==4.30.2
+accelerate==0.20.3
+gradio==3.50.2
+cupy==12.3.0
+scikit-image==0.22.0
